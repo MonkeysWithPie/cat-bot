@@ -2041,6 +2041,7 @@ async def on_message(message: discord.Message) -> None:
 
         user.rain_minutes += int(rain_duration)
         user.rain_minutes_bought += int(rain_duration)
+        newly_premium = not user.premium
         user.premium = True
         await user.save()
 
@@ -2049,11 +2050,16 @@ async def on_message(message: discord.Message) -> None:
         # try to dm the user the thanks msg
         try:
             person = await fetch_dm_channel(user)
+            if newly_premium:
+                bonus_suffix = "As a bonus, you now have access to the `/editprofile` and `/customcat` commands, as well as a special role in [our Discord server](<https://discord.gg/staring>). Thanks for your support!"
+            else:
+                bonus_suffix = "Thank you for your continued support!"
+            
             await person.send(
                 f"""**You have recieved {rain_duration} minutes of Cat Rain!** ☔
 
-Thanks for your support!
-You can start a rain with `/rain`. By buying you also get access to `/editprofile` and `/customcat` commands as well as a role in [our Discord server](<https://discord.gg/staring>)!
+{bonus_suffix}
+You can start a rain with `/rain`.
 
 Enjoy your goods!"""
             )
@@ -5529,16 +5535,16 @@ async def rain(message: discord.Interaction, minutes: int | None):
 
     button = Button(
         emoji="☔",
-        label="Rain!" + (" (disabled by server)" if not server.do_rain else ""),
-        style=ButtonStyle.blurple,
+        label=("Start a Cat Rain!" if server.do_rain else "Rain! (disabled by server)"),
+        style=ButtonStyle.blurple if server.do_rain else ButtonStyle.gray,
         disabled=not server.do_rain,
     )
 
     server_rains = ""
     server_minutes = profile.rain_minutes
     if server_minutes > 0:
-        server_rains = f" (+**{server_minutes:,}** bonus {plural('minute', server_minutes)})"
-    balance_line = f"You currently have **{user.rain_minutes:,}** {plural('minute', user.rain_minutes)} of rains!{server_rains}"
+        server_rains = f", **+{server_minutes:,}** Rain {plural('minute', server_minutes)} in this server"
+    balance_line = f"You have **{user.rain_minutes:,}** global Rain {plural('minute', user.rain_minutes)} available{server_rains}!"
 
     if minutes is not None:
         try:
@@ -5567,23 +5573,25 @@ async def rain(message: discord.Interaction, minutes: int | None):
 
     button.callback = rain_modal
 
-    shopbutton = Button(emoji="🛒", label="Store (-20%!)", url="https://catbot.shop")
+    shopbutton = Button(emoji="🛒", label="Buy Rains (-20%!)", url="https://catbot.shop")
 
     view = LayoutView(timeout=VIEW_TIMEOUT)
 
+    bonus_perks = ""
+    if not user.premium:
+        bonus_perks = f"Your first Rain purchase will grant you access to {get_command_mention("editprofile")} and {get_command_mention("customcat")}, as a nice bonus!"
+
     embed = Container(
         "## ☔ Cat Rains",
-        "Cat Rains are power-ups which spawn cats super fast for a limited amounts of time in a channel of your choice.",
-        f"""You can get those by buying them at our [store](<https://catbot.shop>) or by winning them in an event.
-This bot is developed by a single person so buying one would be very appreciated.
-As a bonus, you will get access to {get_command_mention("editprofile")} and {get_command_mention("customcat")} commands!
-- 1 Rain Minute = 22 cats
-- Fastest times are not saved during rains.
+        "Cat Rains are power-ups that spawn cats super fast for a limited amount of time.",
+        Section(shopbutton, f"You can get Cat Rains from the store, or from some events. {bonus_perks}",),
+        f"""- 1 Rain Minute spawns 22 cats.
+- Catching times are not saved during rains.
 - Late catching time is reduced to 1 second.
-- Bonus cats are +1 instead of minigame.""",
+- Bonus cats only give +1 cat, but don't have a minigame.""",
         "===",
         balance_line,
-        ActionRow(button, shopbutton),
+        ActionRow(button),
     )
 
     view.add_item(embed)
